@@ -15,7 +15,7 @@ async def on_ready():
     print(f'We have logged in as {client.user}')
 
     try:
-        channel_id = open('DISCORD_CHANNEL_ID').read()
+        channel_id = int(open('DISCORD_CHANNEL_ID').read())
     except Exception as e:
         print(e)
 
@@ -45,13 +45,14 @@ def bot_scrape():
         offers = scraper.scrape_offers(driver)
     except Exception as e:
         print(str(e) + ' \nQuitting')
-        exit(-1)
+        driver.quit()
+        return
     finally:
         driver.quit()
 
     final_offers = []
     for offer in offers:
-        if not scraper.is_desired_iphone(offer['title']):
+        if not scraper.is_desired_iphone(offer['title'], offer['added_time']):
             print('Unused: ' + str(offer) + '\n')
             continue
         print(str(offer) + '\n')
@@ -64,11 +65,14 @@ async def main_functionality(channel_id):
 
     channel = client.get_channel(channel_id)
 
-    left = 11
-    right = 16
+    await channel.send('Scraping')
+
+    left = 8
+    right = 12
 
     already_used_offers = []
     while not client.is_closed():
+        start_time = time.time()
         rand = random.randrange(left, right)
         print('Sleeping for ' + str(rand))
 
@@ -77,6 +81,7 @@ async def main_functionality(channel_id):
             offers = await loop.run_in_executor(None, bot_scrape)
         except Exception as e:
             print(str(e))
+            continue
 
         for offer in offers:
             if offer['title'] in already_used_offers:
@@ -84,24 +89,39 @@ async def main_functionality(channel_id):
 
             new_embed = discord.Embed()
             new_embed.title = 'Nowa oferta'
+
             new_embed.description = (
                 'Tytuł: ' + f"{offer['title']}\n" +
                 'Cena: ' + f"{offer['price']}\n" +
                 'Lokalizacja: ' + f"{offer['location']}\n" +
                 'Link: ' + f"{offer['url']}\n" +
-                'Ogłoszenie dodano: ' + f"{offer['added_time']}"
+                'Ogłoszenie dodano: ' + f"{offer['added_time']}\n"
             )
+
+            print(offer['image_url'])
+
+            if offer['image_url'] is not None:
+                try:
+                    new_embed.image.url = offer['image_url']
+                    new_embed.set_image(url=offer['image_url'])
+                except Exception as e:
+                    print(e)
 
             await channel.send(embed=new_embed)
             await asyncio.sleep(2)
 
             already_used_offers.append(offer['title'])
-
         print('\n')
         print('\n')
         print('\n')
 
         await asyncio.sleep(rand)
+        print(time.time() - start_time)
+
+        log_file = open('log_file', 'a')
+        log_file.write(str(time.time() - start_time))
+        log_file.write('\n')
+        log_file.close()
 
 DISCORD_API_KEY = open("DISCORD_API_KEY", "r")
 DISCORD_API_KEY = DISCORD_API_KEY.read()

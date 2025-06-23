@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
 from urllib.parse import urljoin
+import undetected_chromedriver as uc
 
 try:
     BASE_URL = open('BASE_URL').read()
@@ -31,11 +32,14 @@ class Scraper:
         offer_name = str(offer_title)
         offer_name = offer_name.lower()
 
-        offer_title = str(offer_title)
-        offer_title = offer_title.lower()
+        time_added_lower = str(time_added)
+        time_added_lower = time_added_lower.lower()
 
         # Throwing out old offers
-        if 'dzisiaj' not in time_added:
+        if 'dzisiaj' not in time_added_lower:
+            return False
+
+        if 'odświeżono' in time_added_lower:
             return False
 
         proboably_not_phones = ['etui', 'szkło',
@@ -65,22 +69,22 @@ class Scraper:
         return False
 
     def setup_driver(self):
-        proxy = self.get_random_proxy()
+        # proxy = self.get_random_proxy()
 
         profile = FirefoxProfile()
 
-        values = proxy.split(':')
-        ip = values[0]
-        port = values[1]
+        # values = proxy.split(':')
+        # ip = values[0]
+        # port = values[1]
 
-        print(ip + ' ' + port)
+        # print(ip + ' ' + port)
 
-        profile.set_preference("network.proxy.type", 1)
-        profile.set_preference("network.proxy.http", ip)
-        profile.set_preference("network.proxy.http_port", int(port))
-        profile.set_preference("network.proxy.ssl", ip)
-        profile.set_preference("network.proxy.ssl_port", int(port))
-        profile.set_preference("network.proxy.socks_remote_dns", True)
+        # profile.set_preference("network.proxy.type", 1)
+        # profile.set_preference("network.proxy.http", ip)
+        # profile.set_preference("network.proxy.http_port", int(port))
+        # profile.set_preference("network.proxy.ssl", ip)
+        # profile.set_preference("network.proxy.ssl_port", int(port))
+        # profile.set_preference("network.proxy.socks_remote_dns", True)
         profile.set_preference("browser.cache.disk.enable", False)
         profile.set_preference("browser.cache.memory.enable", False)
         profile.set_preference("browser.cache.offline.enable", False)
@@ -88,17 +92,25 @@ class Scraper:
         profile.update_preferences()
 
         options = Options()
-        options.add_argument('-private')
         options.headless = True
+        options.profile = profile
+        options.add_argument('--private')
+        options.add_argument('--headless')
 
         driver = webdriver.Firefox(options=options)
+        # driver.get("https://whatismyipaddress.com")
         driver.get(BASE_URL)
+
+        # options = uc.ChromeOptions()
+
+        # driver = uc.Chrome(use_subprocess=False)
+        # try:
+        #    driver.get(BASE_URL)
+        # except Exception as e:
+        #    print('Driver connection error ' + str(e))
 
         print("Connected to the site")
         return driver
-
-    def get_random_proxy(self):
-        return random.choice(proxies)
 
     def accept_cookies(self, driver):
         try:
@@ -129,6 +141,26 @@ class Scraper:
                 title_elem = card.find_element(By.TAG_NAME, "h4")
 
             title = title_elem.text.strip()
+
+            try:
+                i = 0
+                while i < 5:
+                    img_elem = card.find_element(By.TAG_NAME, "img")
+
+                    img_url = (
+                        img_elem.get_attribute("data-src")
+                        or img_elem.get_attribute("data-imgsrc")
+                        or img_elem.get_attribute("src")
+                    )
+
+                    if "no_thumbnail" in img_url or "nophoto" in img_url:
+                        img_url = None
+                    else:
+                        break
+
+                    i += 1
+            except Exception:
+                img_url = None
 
             try:
                 price_elem = card.find_element(
@@ -165,7 +197,8 @@ class Scraper:
                 "url": full_url,
                 "location": location,
                 "shipping": shipping_available,
-                "added_time": added_time
+                "added_time": added_time,
+                "image_url": img_url
             }
 
         except Exception as e:
@@ -187,6 +220,7 @@ def bot_scrape():
     driver = scraper.setup_driver()
     time.sleep(2)
 
+    return
     try:
         scraper.accept_cookies(driver)
         scraper.wait_for_offers(driver)
@@ -196,6 +230,8 @@ def bot_scrape():
         exit(-1)
     finally:
         driver.quit()
+
+    print(offers)
 
     final_offers = []
     for offer in offers:
