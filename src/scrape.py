@@ -1,5 +1,4 @@
 import time
-import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -7,22 +6,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
 from urllib.parse import urljoin
-import undetected_chromedriver as uc
 
-try:
-    BASE_URL = open('BASE_URL').read()
-except Exception as e:
-    print(e)
-    exit(-1)
-
-try:
-    proxies_file = open('proxies', 'r')
-    proxies = proxies_file.read()
-    proxies = proxies.split('\n')
-    proxies.pop(10)
-except Exception as e:
-    print(e)
-    exit(-1)
+olx_url = open('BASE_OLX_URL').read()
+olx_div = "div[data-cy='l-card']"
+vinted_div = "div[data-testid='grid-item']"
+vinted_url = open('BASE_VINTED_URL').read()
 
 
 class Scraper:
@@ -40,6 +28,9 @@ class Scraper:
             return False
 
         if 'odświeżono' in time_added_lower:
+            return False
+
+        if 'bateria' in offer_title:
             return False
 
         proboably_not_phones = ['etui', 'szkło',
@@ -89,17 +80,19 @@ class Scraper:
         profile.set_preference("browser.cache.memory.enable", False)
         profile.set_preference("browser.cache.offline.enable", False)
         profile.set_preference("network.http.use-cache", False)
+        # profile.set_preference("permissions.default.stylesheet", 2)
+        # profile.set_preference("permissions.default.image", 2)
+        # profile.set_preference("javascript.enabled", False)
         profile.update_preferences()
 
         options = Options()
         options.headless = True
         options.profile = profile
         options.add_argument('--private')
-        options.add_argument('--headless')
+        # options.add_argument('--headless')
 
         driver = webdriver.Firefox(options=options)
         # driver.get("https://whatismyipaddress.com")
-        driver.get(BASE_URL)
 
         # options = uc.ChromeOptions()
 
@@ -109,31 +102,41 @@ class Scraper:
         # except Exception as e:
         #    print('Driver connection error ' + str(e))
 
-        print("Connected to the site")
+        return driver
+
+    def open_site(self, driver, url):
+        try:
+            driver.get(url)
+        except Exception as e:
+            print(e)
+            return None
+
         return driver
 
     def accept_cookies(self, driver):
         try:
-            accept = WebDriverWait(driver, 5).until(
+            accept = WebDriverWait(driver, 7).until(
                 EC.element_to_be_clickable(
-                    (By.XPATH, "//button[contains(text(),'Akceptuję')]"))
+                    (By.ID, 'onetrust-accept-btn-handler'))
             )
             accept.click()
             print("Popup closed")
-        except Exception as e:
-            print(e)
+        except Exception:
+            print('No popup')
 
-    def wait_for_offers(self, driver):
+    def wait_for_offers(self, driver, div):
+        print('Waiting for offers')
         WebDriverWait(driver, 10).until(
             EC.presence_of_all_elements_located(
-                (By.CSS_SELECTOR, "div[data-cy='l-card']"))
+                (By.CSS_SELECTOR, div))
         )
+        print('Offers ready')
 
-    def extract_offer_data(self, card):
+    def extract_olx_offer_data(self, card):
         try:
             link_elem = card.find_element(By.TAG_NAME, "a")
             href = link_elem.get_attribute("href")
-            full_url = urljoin(BASE_URL, href)
+            full_url = urljoin(olx_url, href)
 
             try:
                 title_elem = card.find_element(By.TAG_NAME, "h6")
@@ -143,22 +146,16 @@ class Scraper:
             title = title_elem.text.strip()
 
             try:
-                i = 0
-                while i < 5:
-                    img_elem = card.find_element(By.TAG_NAME, "img")
+                img_elem = card.find_element(By.TAG_NAME, "img")
 
-                    img_url = (
-                        img_elem.get_attribute("data-src")
-                        or img_elem.get_attribute("data-imgsrc")
-                        or img_elem.get_attribute("src")
-                    )
+                img_url = (
+                    img_elem.get_attribute("data-src")
+                    or img_elem.get_attribute("data-imgsrc")
+                    or img_elem.get_attribute("src")
+                )
 
-                    if "no_thumbnail" in img_url or "nophoto" in img_url:
-                        img_url = None
-                    else:
-                        break
-
-                    i += 1
+                if "no_thumbnail" in img_url or "nophoto" in img_url:
+                    img_url = None
             except Exception:
                 img_url = None
 
@@ -205,11 +202,21 @@ class Scraper:
             print(f"Skipping one card due to error: {e}")
             return None
 
-    def scrape_offers(self, driver, max_offers=10):
-        cards = driver.find_elements(By.CSS_SELECTOR, "div[data-cy='l-card']")
+    def extract_vinted_offer_data(self, card):
+        link_elem = card.find_element(By.TAG_NAME, "p")
+
+    def scrape_offers(self, driver, div, max_offers=10):
+        print('Scraping offers')
+        try:
+            cards = driver.find_elements(By.CSS_SELECTOR, div)
+        except Exception:
+            return None
+
         results = []
         for card in cards[:max_offers]:
-            data = self.extract_offer_data(card)
+            print(card)
+            # data = self.extract_offer_data(card)
+            data = self.extract_vinted_offer_data(card)
             if data:
                 results.append(data)
         return results
@@ -218,25 +225,34 @@ class Scraper:
 def bot_scrape():
     scraper = Scraper()
     driver = scraper.setup_driver()
+
+    driver = scraper.open_site(driver, vinted_url)
+
+    if driver is None:
+        print('Site did not open')
+        return
+
     time.sleep(2)
 
-    return
     try:
         scraper.accept_cookies(driver)
-        scraper.wait_for_offers(driver)
-        offers = scraper.scrape_offers(driver)
+        scraper.wait_for_offers(driver, vinted_div)
+        offers = scraper.scrape_offers(driver, vinted_div)
+        print(offers)
     except Exception as e:
         print(str(e) + ' \nQuitting')
         exit(-1)
     finally:
         driver.quit()
 
+    return
+
     print(offers)
 
     final_offers = []
     for offer in offers:
         print(str(offer) + '\n')
-        if not scraper.is_desired_iphone(offer):
+        if not scraper.is_desired_iphone(offer, None):
             continue
         final_offers.append(offer)
 
@@ -246,4 +262,4 @@ def bot_scrape():
     return final_offers
 
 
-# bot_scrape()
+bot_scrape()

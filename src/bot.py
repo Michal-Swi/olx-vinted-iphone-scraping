@@ -19,7 +19,7 @@ async def on_ready():
     except Exception as e:
         print(e)
 
-    client.loop.create_task(main_functionality(channel_id))
+    await main_functionality(channel_id)
 
 
 @client.event
@@ -60,15 +60,33 @@ def bot_scrape():
     return final_offers
 
 
+async def clear_used_offers(used_offers):
+    offers_len = len(used_offers)
+
+    if offers_len <= 10:
+        return used_offers
+
+    i = offers_len - 10
+
+    new_offers = []
+    while i < offers_len:
+        new_offers.append(used_offers[i])
+        i += 1
+
+    return new_offers
+
+
 async def main_functionality(channel_id):
     print('Entered main functionality')
 
     channel = client.get_channel(channel_id)
 
-    await channel.send('Scraping')
+    # await channel.send('Scraping')
 
     left = 8
     right = 12
+
+    scrapes_run = 0
 
     already_used_offers = []
     while not client.is_closed():
@@ -77,8 +95,7 @@ async def main_functionality(channel_id):
         print('Sleeping for ' + str(rand))
 
         try:
-            loop = asyncio.get_event_loop()
-            offers = await loop.run_in_executor(None, bot_scrape)
+            offers = bot_scrape()
         except Exception as e:
             print(str(e))
             continue
@@ -111,6 +128,12 @@ async def main_functionality(channel_id):
             await asyncio.sleep(2)
 
             already_used_offers.append(offer['title'])
+
+            scrapes_run += 1
+
+            if scrapes_run >= 1000:
+                already_used_offers = clear_used_offers(already_used_offers)
+
         print('\n')
         print('\n')
         print('\n')

@@ -9,3 +9,4 @@ src/log_file
 src/proxies
 src/test.py
 src/simulation.py
+src/count_avg_time.py
