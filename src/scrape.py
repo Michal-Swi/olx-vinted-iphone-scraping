@@ -13,8 +13,6 @@ olx_div = "div[data-cy='l-card']"
 vinted_div = "div[data-testid='grid-item']"
 vinted_url = open('BASE_VINTED_URL').read()
 
-proxies = ['78.9.234.55:8080']
-
 
 class Scraper:
     def is_desired_iphone(self, offer_title, time_added):
@@ -27,17 +25,14 @@ class Scraper:
         time_added_lower = time_added_lower.lower()
 
         # Throwing out old offers
-        if 'dzisiaj' not in time_added_lower:
-            return False
+        # if 'dzisiaj' not in time_added_lower:
+        #    return False
 
-        if 'odświeżono' in time_added_lower:
-            return False
-
-        if 'bateria' in offer_title:
-            return False
+        # if 'odświeżono' in time_added_lower:
+        #    return False
 
         proboably_not_phones = ['etui', 'szkło',
-                                'szklo', 'ladowarka', 'ładowarka']
+                                'szklo', 'ladowarka', 'ładowarka', 'bateria']
 
         # Throwing out non-phones
         for red_flag in proboably_not_phones:
@@ -61,9 +56,6 @@ class Scraper:
                 flag = True
 
         return False
-
-    def get_random_proxy(self):
-        return random.choice(proxies)
 
     def setup_driver(self):
         # proxy = self.get_random_proxy()
@@ -97,8 +89,8 @@ class Scraper:
         options = Options()
         options.headless = True
         options.profile = profile
-        options.add_argument('--private')
-        # options.add_argument('--headless')
+        # options.add_argument('--private')
+        options.add_argument('--headless')
 
         driver = webdriver.Firefox(options=options)
         # driver.get("https://whatismyipaddress.com")
@@ -211,7 +203,7 @@ class Scraper:
             print(f"Skipping one card due to error: {e}")
             return None
 
-    def scrape_vinted_offers(driver, base_url, max_offers=10):
+    def scrape_vinted_offers(self, driver, base_url, max_offers=10):
         try:
             driver.get(base_url)
         except Exception:
@@ -282,9 +274,7 @@ class Scraper:
 
         results = []
         for card in cards[:max_offers]:
-            # print(card)
-            # data = self.extract_offer_data(card)
-            data = self.extract_vinted_offer_data(card)
+            data = self.extract_olx_offer_data(card)
             if data:
                 results.append(data)
         return results
@@ -329,4 +319,4 @@ def bot_scrape():
     return final_offers
 
 
-bot_scrape()
+# bot_scrape()
