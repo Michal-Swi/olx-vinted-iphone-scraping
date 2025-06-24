@@ -1,4 +1,5 @@
 import time
+import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -11,6 +12,8 @@ olx_url = open('BASE_OLX_URL').read()
 olx_div = "div[data-cy='l-card']"
 vinted_div = "div[data-testid='grid-item']"
 vinted_url = open('BASE_VINTED_URL').read()
+
+proxies = ['78.9.234.55:8080']
 
 
 class Scraper:
@@ -59,8 +62,12 @@ class Scraper:
 
         return False
 
+    def get_random_proxy(self):
+        return random.choice(proxies)
+
     def setup_driver(self):
         # proxy = self.get_random_proxy()
+        # print(proxy)
 
         profile = FirefoxProfile()
 
@@ -70,6 +77,8 @@ class Scraper:
 
         # print(ip + ' ' + port)
 
+        profile.set_preference("general.useragent.override",
+                               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
         # profile.set_preference("network.proxy.type", 1)
         # profile.set_preference("network.proxy.http", ip)
         # profile.set_preference("network.proxy.http_port", int(port))
@@ -202,8 +211,67 @@ class Scraper:
             print(f"Skipping one card due to error: {e}")
             return None
 
-    def extract_vinted_offer_data(self, card):
-        link_elem = card.find_element(By.TAG_NAME, "p")
+    def scrape_vinted_offers(driver, base_url, max_offers=10):
+        try:
+            driver.get(base_url)
+        except Exception:
+            return None
+
+        try:
+            accept = WebDriverWait(driver, 20).until(
+                EC.element_to_be_clickable(
+                    (By.ID, 'onetrust-accept-btn-handler'))
+            )
+            accept.click()
+            print("Popup closed")
+        except Exception:
+            print('No popup')
+
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located(
+                (By.CSS_SELECTOR, "div.feed-grid__item"))
+        )
+
+        offer_elements = driver.find_elements(
+            By.CSS_SELECTOR, "div.feed-grid__item")[:max_offers]
+
+        offers = []
+        for offer in offer_elements:
+            try:
+                title_elem = offer.find_element(
+                    By.CSS_SELECTOR, "p[data-testid$='--description-title']")
+                title = title_elem.text.strip()
+            except Exception:
+                title = "Brak tytułu"
+
+            try:
+                price_elem = offer.find_element(
+                    By.CSS_SELECTOR, "p[data-testid$='--price-text']")
+                price = price_elem.text.strip()
+            except Exception:
+                price = "Brak ceny"
+
+            try:
+                link_elem = offer.find_element(
+                    By.CSS_SELECTOR, "a.new-item-box__overlay")
+                url = link_elem.get_attribute("href")
+            except Exception:
+                url = "Brak URL"
+
+            try:
+                img_elem = offer.find_element(By.CSS_SELECTOR, "img")
+                img_url = img_elem.get_attribute("src")
+            except Exception:
+                img_url = None
+
+            offers.append({
+                "title": title,
+                "price": price,
+                "url": url,
+                "image": img_url
+            })
+
+        return offers
 
     def scrape_offers(self, driver, div, max_offers=10):
         print('Scraping offers')
@@ -214,7 +282,7 @@ class Scraper:
 
         results = []
         for card in cards[:max_offers]:
-            print(card)
+            # print(card)
             # data = self.extract_offer_data(card)
             data = self.extract_vinted_offer_data(card)
             if data:
@@ -232,13 +300,12 @@ def bot_scrape():
         print('Site did not open')
         return
 
-    time.sleep(2)
+    # time.sleep(2)
 
     try:
         scraper.accept_cookies(driver)
         scraper.wait_for_offers(driver, vinted_div)
         offers = scraper.scrape_offers(driver, vinted_div)
-        print(offers)
     except Exception as e:
         print(str(e) + ' \nQuitting')
         exit(-1)
