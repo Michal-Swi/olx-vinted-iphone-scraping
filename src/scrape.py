@@ -25,8 +25,8 @@ class Scraper:
         time_added_lower = time_added_lower.lower()
 
         # Throwing out old offers
-        # if 'dzisiaj' not in time_added_lower:
-        #    return False
+        if 'dzisiaj' not in time_added_lower:
+            return False
 
         # if 'odświeżono' in time_added_lower:
         #    return False
@@ -69,8 +69,14 @@ class Scraper:
 
         # print(ip + ' ' + port)
 
-        profile.set_preference("general.useragent.override",
-                               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+        user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        ]
+
+        profile.set_preference(
+            "general.useragent.override", random.choice(user_agents))
         # profile.set_preference("network.proxy.type", 1)
         # profile.set_preference("network.proxy.http", ip)
         # profile.set_preference("network.proxy.http_port", int(port))
@@ -89,7 +95,7 @@ class Scraper:
         options = Options()
         options.headless = True
         options.profile = profile
-        # options.add_argument('--private')
+        options.add_argument('--private')
         options.add_argument('--headless')
 
         driver = webdriver.Firefox(options=options)

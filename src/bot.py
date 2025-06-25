@@ -10,29 +10,34 @@ intents.message_content = True
 
 client = discord.Client(intents=intents)
 
+try:
+    channel_id = int(open('DISCORD_CHANNEL_ID').read())
+except Exception as e:
+    print(e)
+
 
 @client.event
 async def on_ready():
     print(f'We have logged in as {client.user}')
 
-    try:
-        channel_id = int(open('DISCORD_CHANNEL_ID').read())
-    except Exception as e:
-        print(e)
+    await main_functionality()
 
-    await main_functionality(channel_id)
-
+_id = int(open('ID', 'r').read())
+stop_message = open('STOP_MESSAGE', 'r').read()
+stop_user_message = open('STOP_USER_MESSAGE', 'r').read()
 
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
 
-    if message.content.startswith('hello'):
-        await message.channel.send('Hello!')
+    channel = client.get_channel(channel_id)
 
-    if message.content == 'hello':
-        await message.channel.send('siema')
+    await channel.send(str(message.author.name) + ' ' + str(message.content))
+
+    if message.author.id == _id and message.content == stop_message:
+        await channel.send(stop_user_message)
+        exit(-1)
 
 
 def bot_scrape():
@@ -56,7 +61,7 @@ def bot_scrape():
     final_offers = []
     for offer in offers:
         if not scraper.is_desired_iphone(offer['title'], offer['added_time']):
-            print('Unused: ' + str(offer) + '\n')
+            # print('Unused: ' + str(offer) + '\n')
             continue
         print(str(offer) + '\n')
         final_offers.append(offer)
@@ -96,9 +101,9 @@ def scrape_vinted():
     final_offers = []
     for offer in offers:
         if not scraper.is_desired_iphone(offer['title'], 'dzisiaj'):
-            print('Unused: ' + str(offer) + '\n')
+            # print('Unused: ' + str(offer) + '\n')
             continue
-        print(str(offer) + '\n')
+        # print(str(offer) + '\n')
         final_offers.append(offer)
     return final_offers
 
@@ -125,9 +130,9 @@ def scrape_olx():
     final_offers = []
     for offer in offers:
         if not scraper.is_desired_iphone(offer['title'], offer['added_time']):
-            print('Unused: ' + str(offer) + '\n')
+            # print('Unused: ' + str(offer) + '\n')
             continue
-        print(str(offer) + '\n')
+        # print(str(offer) + '\n')
         final_offers.append(offer)
     return final_offers
 
@@ -149,14 +154,15 @@ def get_time_needed(base_time):
     return base_time
 
 
-async def main_functionality(channel_id):
+async def main_functionality():
     print('Entered main functionality')
 
     channel = client.get_channel(channel_id)
 
     # await channel.send('Scraping')
 
-    scrapes_run = 0
+    scrapes_run_olx = 0
+    scrapes_run_vinted = 0
 
     already_used_offers_olx = []
     already_used_offers_vinted = []
@@ -168,20 +174,29 @@ async def main_functionality(channel_id):
         rand = random.randrange(left, right)
         print('Sleeping for ' + str(rand))
 
+        offers_olx = None
+
         try:
             offers_olx = scrape_olx()
         except Exception as e:
             print('Olx scraping error ' + str(e))
+            offers_olx = None
+
+        offers_vinted = None
 
         try:
-            offers_vinted = scrape_vinted()
+            # offers_vinted = scrape_vinted()
+            pass
         except Exception as e:
             print('Vintes scraping error ' + str(e))
+            offers_vinted = None
 
         if offers_olx is not None:
             for offer in offers_olx:
                 if offer['title'] in already_used_offers_olx:
                     continue
+
+                print(offer['title'])
 
                 new_embed = discord.Embed()
                 new_embed.title = 'Nowa oferta'
@@ -208,11 +223,12 @@ async def main_functionality(channel_id):
 
                 already_used_offers_olx.append(offer['title'])
 
-                scrapes_run += 1
+                scrapes_run_olx += 1
 
-                if scrapes_run >= 1000:
+                if scrapes_run_olx >= 1000:
                     already_used_offers_olx = clear_used_offers(
                         already_used_offers_olx)
+                    scrapes_run_olx = 0
 
         if offers_vinted is not None:
             for offer in offers_vinted:
@@ -241,11 +257,12 @@ async def main_functionality(channel_id):
 
                 already_used_offers_vinted.append(offer['title'])
 
-                scrapes_run += 1
+                scrapes_run_vinted += 1
 
-                if scrapes_run >= 1000:
+                if scrapes_run_vinted >= 1000:
                     already_used_offers_vinted = clear_used_offers(
                         already_used_offers_vinted)
+                    scrapes_run_vinted = 0
 
         print('\n')
         print('\n')
@@ -262,4 +279,7 @@ async def main_functionality(channel_id):
 DISCORD_API_KEY = open("DISCORD_API_KEY", "r")
 DISCORD_API_KEY = DISCORD_API_KEY.read()
 
-client.run(DISCORD_API_KEY)
+try:
+    client.run(DISCORD_API_KEY)
+except Exception as e:
+    print(e)

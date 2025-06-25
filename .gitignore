@@ -12,3 +12,7 @@ src/simulation.py
 src/count_avg_time.py
 src/t.py
 src/new_log_file
+src/DISCORD_CHANNEL_ID
+src/ID
+src/STOP_MESSAGE
+src/STOP_USER_MESSAGE
