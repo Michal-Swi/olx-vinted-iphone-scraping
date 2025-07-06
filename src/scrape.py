@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timedelta
 import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -15,12 +16,18 @@ vinted_url = open('BASE_VINTED_URL').read()
 
 
 class Scraper:
-    def is_desired_iphone(self, offer_title, time_added):
-        desired_phones = ['x', 'xs', 'xr', '11',
-                          '11', '12', '13', '14', '15', '16', 'se']
-        offer_name = str(offer_title)
-        offer_name = offer_name.lower()
+    def is_within_15_minutes(self, time_str):
+        hour, minute = map(int, time_str.split(":"))
 
+        now = datetime.now()
+        target_time = now.replace(
+            hour=hour, minute=minute, second=0, microsecond=0)
+
+        diff = abs(now - target_time)
+
+        return diff <= timedelta(minutes=15)
+
+    def is_time_correct(self, time_added):
         time_added_lower = str(time_added)
         time_added_lower = time_added_lower.lower()
 
@@ -28,11 +35,38 @@ class Scraper:
         if 'dzisiaj' not in time_added_lower:
             return False
 
-        # if 'odświeżono' in time_added_lower:
-        #    return False
+        if 'odświeżono' in time_added_lower:
+            return False
+
+        time_s = time_added_lower.split(' ')
+
+        print(time_s)
+
+        try:
+            time_range_correct = self.is_within_15_minutes(
+                time_s[len(time_s) - 1])
+        except:
+            time_range_correct = False
+
+        if not time_range_correct and time_added != 'vinted':
+            print('Time not correct ' + str(time_added))
+            return False
+
+    def is_desired_iphone(self, offer_title, time_added):
+        desired_phones = ['x', 'xs', 'xr', '11',
+                          '11', '12', '13', '14', '15', '16', 'se']
+        offer_name = str(offer_title)
+        offer_name = offer_name.lower()
+
+        if time_added != 'vinted':
+            if self.is_time_correct(time_added) == False:
+                return False
+
+        # time_object = datetime.strptime(time_number, '%H:%M').time()
+        # print(time_object)
 
         proboably_not_phones = ['etui', 'szkło',
-                                'szklo', 'ladowarka', 'ładowarka', 'bateria']
+                                'szklo', 'ladowarka', 'ładowarka']
 
         # Throwing out non-phones
         for red_flag in proboably_not_phones:
@@ -45,15 +79,12 @@ class Scraper:
         except Exception as e:
             print(e)
 
-        flag = False
-        for word in split_offer_name:
-            if flag and word in desired_phones:
-                return True
-            elif flag and word not in desired_phones:
-                return False
+        if 'iphone' not in split_offer_name:
+            return False
 
-            if word == 'iphone':
-                flag = True
+        for desired_phone in desired_phones:
+            if desired_phone in split_offer_name:
+                return True
 
         return False
 
@@ -296,7 +327,7 @@ def bot_scrape():
         print('Site did not open')
         return
 
-    # time.sleep(2)
+    # await asyncio.sleep(2)
 
     try:
         scraper.accept_cookies(driver)
